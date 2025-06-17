@@ -1,45 +1,47 @@
+
+import openai
 import streamlit as st
-import tempfile
-import os
-from feedback_engine import analyze_pdf, compare_documents
+from PyPDF2 import PdfReader
 
-st.set_page_config(page_title="제안서 자동 피드백 시스템", layout="centered")
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-st.title("📄 제안서 자동 피드백 시스템")
-mode = st.radio("분석 모드 선택", ["📑 단일 문서 피드백", "📂 문서 비교 분석"])
+def extract_text_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
 
-if mode == "📑 단일 문서 피드백":
-    uploaded_file = st.file_uploader("PDF 파일을 업로드하세요", type="pdf")
-    if uploaded_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            tmp_path = tmp_file.name
-        
-        with st.spinner("분석 중입니다..."):
-            feedback = analyze_pdf(tmp_path)
-        st.subheader("📋 분석 결과")
-        st.write(feedback)
-        os.unlink(tmp_path)
+def analyze_section(text, idx):
+    prompt = f"다음은 제안서의 섹션 {idx+1} 내용입니다:\n{text}\n\n이 내용에 대해 구체적인 피드백을 작성해주세요."
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "너는 제안서를 분석해주는 전문가야."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.4
+    )
+    return response.choices[0].message.content
 
-elif mode == "📂 문서 비교 분석":
-    st.markdown("**기준 문서 (예: 제안요청서)**")
-    base_file = st.file_uploader("", type="pdf", key="base")
-    st.markdown("**비교할 문서 (예: 제안서)**")
-    target_file = st.file_uploader(" ", type="pdf", key="target")
+def analyze_pdf(pdf_path):
+    text = extract_text_from_pdf(pdf_path)
+    sections = text.split("\n\n")
+    feedbacks = []
+    for i, section in enumerate(sections):
+        if len(section.strip()) < 100:
+            continue
+        feedback = analyze_section(section, i)
+        feedbacks.append(f"--- Slide {i + 1} ---\n" + feedback)
+    return "\n\n".join(feedbacks)
 
-    if base_file and target_file:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_base:
-            tmp_base.write(base_file.read())
-            base_path = tmp_base.name
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_target:
-            tmp_target.write(target_file.read())
-            target_path = tmp_target.name
-
-        with st.spinner("문서 비교 분석 중입니다..."):
-            result = compare_documents(base_path, target_path)
-
-        st.subheader("📋 비교 분석 결과")
-        st.write(result)
-        os.unlink(base_path)
-        os.unlink(target_path)
+def compare_documents(base_path, target_path):
+    base_text = extract_text_from_pdf(base_path)
+    target_text = extract_text_from_pdf(target_path)
+    prompt = f"기준 문서:\n{base_text}\n\n비교 대상 문서:\n{target_text}\n\n두 문서를 비교하고 부족한 부분에 대한 피드백을 작성해줘."
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "너는 제안서를 비교 분석하는 전문가야."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.4
+    )
+    return response.choices[0].message.content
