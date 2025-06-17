@@ -1,18 +1,18 @@
 
-# GPT 제안서 피드백 시스템
+# 제안서 피드백 생성기
 
-## 설명
-이 프로젝트는 제안요청서와 제안서를 함께 업로드하면 GPT가 비교하여 자동 피드백을 생성해주는 Streamlit 웹앱입니다.
+Groq API와 Streamlit을 활용하여 제안서와 제안요청서 간의 차이를 자연어 피드백으로 변환하는 간단한 앱입니다.
 
 ## 실행 방법
-```
-pip install -r requirements.txt
+
+1. `.streamlit/secrets.toml`에 Groq API 키를 입력하세요.
+2. 아래 명령어로 실행하세요:
+
+```bash
 streamlit run app.py
 ```
 
-## 배포 방법
-Streamlit Community Cloud에서 배포 시, Secrets에 아래 환경변수를 추가하세요:
+## 필요 패키지
 
-```
-OPENAI_API_KEY = "your-key"
-```
+- streamlit
+- requests
